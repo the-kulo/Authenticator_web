@@ -13,25 +13,47 @@ function App() {
   const [showModal, setShowModal] = useState(false);
   const [alert, setAlert] = useState({ show: false, message: '', variant: 'info' });
   const [serverTime, setServerTime] = useState(null);
+  const [timeOffset, setTimeOffset] = useState(0);
 
   useEffect(() => {
     loadAuthenticators();
-    // 减少刷新间隔到10秒，提高同步精度
-    const interval = setInterval(loadAuthenticators, 10000);
-    return () => clearInterval(interval);
+    syncTime(); // 初始时间同步
+    
+    // 只保留时间同步的定时器，移除数据刷新定时器
+    const timeInterval = setInterval(syncTime, 30000);
+    
+    return () => {
+      clearInterval(timeInterval);
+    };
   }, []);
+
+  const syncTime = async () => {
+    try {
+      const timeData = await api.getServerTime();
+      const localTime = Math.floor(Date.now() / 1000);
+      setTimeOffset(timeData.server_time - localTime);
+    } catch (error) {
+      console.warn('时间同步失败:', error.message);
+    }
+  };
 
   const loadAuthenticators = async () => {
     try {
       setLoading(true);
       const response = await api.getAuthenticators();
       setAuthenticators(response.data);
-      setServerTime(response.server_time); // 保存服务器时间
+      setServerTime(response.server_time);
     } catch (error) {
       showAlert('加载失败: ' + error.message, 'danger');
     } finally {
       setLoading(false);
     }
+  };
+
+  // 新增：当倒计时到零时触发的回调函数
+  const handleCountdownZero = () => {
+    console.log('倒计时到零，刷新验证码');
+    loadAuthenticators();
   };
 
   const showAlert = (message, variant = 'info') => {
@@ -85,6 +107,8 @@ function App() {
               onDelete={handleDelete}
               onCopy={showAlert}
               serverTime={serverTime}
+              timeOffset={timeOffset}
+              onCountdownZero={handleCountdownZero}
             />
             
             <AddModal 

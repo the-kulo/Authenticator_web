@@ -25,6 +25,14 @@ const api = {
       throw new Error(response.data.error || '删除失败');
     }
     return response.data;
+  },
+  
+  async getServerTime() {
+    const response = await axios.get(`${API_BASE_URL}/time`);
+    if (response.data.success) {
+      return response.data;
+    }
+    throw new Error(response.data.error || '获取服务器时间失败');
   }
 };
 

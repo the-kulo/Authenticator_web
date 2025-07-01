@@ -3,37 +3,58 @@ import { Card, Table, Button, Spinner } from 'react-bootstrap';
 import { FaTrash, FaCopy, FaInbox } from 'react-icons/fa';
 import CountdownCircle from './CountdownCircle';
 
-const AuthenticatorTable = ({ authenticators, loading, onDelete, onCopy, serverTime }) => {
+const AuthenticatorTable = ({ authenticators, loading, onDelete, onCopy, serverTime, timeOffset, onCountdownZero }) => {
   const [countdown, setCountdown] = useState({});
+  const [lastRemaining, setLastRemaining] = useState(null);
+  const [hasTriggered, setHasTriggered] = useState(false);
 
   useEffect(() => {
-    // 初始化倒计时，基于服务器时间
+    // 初始化倒计时
     if (serverTime && authenticators.length > 0) {
       const newCountdown = {};
       authenticators.forEach(auth => {
         newCountdown[auth.id] = auth.remaining_time;
       });
       setCountdown(newCountdown);
+      setHasTriggered(false); // 重置触发状态
     }
   }, [authenticators, serverTime]);
 
   useEffect(() => {
     const interval = setInterval(() => {
+      const currentTime = Math.floor(Date.now() / 1000) + (timeOffset || 0);
+      const remaining = 30 - (currentTime % 30);
+      
       setCountdown(prev => {
         const newCountdown = { ...prev };
-        const currentTime = Math.floor(Date.now() / 1000);
         
         authenticators.forEach(auth => {
-          // 基于当前时间重新计算剩余时间，而不是简单减1
-          const remaining = 30 - (currentTime % 30);
           newCountdown[auth.id] = remaining;
         });
+        
         return newCountdown;
       });
+      
+      // 当倒计时为1秒时触发刷新
+      if (remaining === 1 && !hasTriggered && authenticators.length > 0) {
+        console.log(`倒计时1秒，准备刷新: ${new Date().toLocaleTimeString()}`);
+        setHasTriggered(true);
+        
+        // 延迟1.1秒后刷新，确保新验证码已生成
+        setTimeout(() => {
+          console.log(`执行刷新: ${new Date().toLocaleTimeString()}`);
+          onCountdownZero();
+        }, 1000);
+      }
+      
+      // 重置触发状态（在新周期开始时）
+      if (remaining > 25 && hasTriggered) {
+        setHasTriggered(false);
+      }
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [authenticators]);
+  }, [authenticators, timeOffset, onCountdownZero, hasTriggered]);
 
   const copyToClipboard = async (code) => {
     try {

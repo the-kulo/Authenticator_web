@@ -1,8 +1,9 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, request, jsonify, render_template
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 import pyotp
 import time
+import ntplib
 import os
 from dotenv import load_dotenv
 from urllib.parse import quote_plus
@@ -60,6 +61,32 @@ def index():
     """Main page"""
     return render_template('index.html')
 
+def get_network_time():
+    """获取网络时间服务器的时间"""
+    try:
+        # 尝试多个NTP服务器
+        ntp_servers = [
+            'time.windows.com',
+            'pool.ntp.org', 
+            'time.nist.gov',
+            'time.google.com'
+        ]
+        
+        for server in ntp_servers:
+            try:
+                client = ntplib.NTPClient()
+                response = client.request(server, version=3)
+                return int(response.tx_time)
+            except:
+                continue
+        
+        # 如果所有NTP服务器都失败，回退到本地时间
+        print("Warning: All NTP servers failed, using local time")
+        return int(time.time())
+    except Exception as e:
+        print(f"Error getting network time: {e}")
+        return int(time.time())
+
 @app.route('/api/authenticators', methods=['GET'])
 def get_authenticators():
     """Get all authenticators and their TOTP codes"""
@@ -67,8 +94,8 @@ def get_authenticators():
         authenticators = Authenticator.query.all()
         result = []
         
-        # 获取当前服务器时间
-        current_time = int(time.time())
+        # 获取网络标准时间
+        current_time = get_network_time()
         
         for auth in authenticators:
             try:
@@ -85,7 +112,7 @@ def get_authenticators():
                     'email': auth.email,
                     'totp_code': current_code,
                     'remaining_time': remaining_time,
-                    'server_time': current_time  # 添加服务器时间戳
+                    'server_time': current_time
                 })
             except Exception as e:
                 print(f"Failed to generate TOTP - ID: {auth.id}, Error: {e}")
@@ -101,7 +128,7 @@ def get_authenticators():
         return jsonify({
             'success': True,
             'data': result,
-            'server_time': current_time  # 全局服务器时间
+            'server_time': current_time
         })
     except Exception as e:
         return jsonify({
@@ -164,6 +191,22 @@ def delete_authenticator(auth_id):
         })
     except Exception as e:
         db.session.rollback()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/time', methods=['GET'])
+def get_server_time():
+    """获取服务器网络时间"""
+    try:
+        current_time = get_network_time()
+        return jsonify({
+            'success': True,
+            'server_time': current_time,
+            'remaining_time': 30 - (current_time % 30)
+        })
+    except Exception as e:
         return jsonify({
             'success': False,
             'error': str(e)
