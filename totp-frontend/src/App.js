@@ -14,12 +14,12 @@ function App() {
   const [alert, setAlert] = useState({ show: false, message: '', variant: 'info' });
   const [serverTime, setServerTime] = useState(null);
   const [timeOffset, setTimeOffset] = useState(0);
+  const [isInitialLoad, setIsInitialLoad] = useState(true); // 新增：区分初始加载和刷新
 
   useEffect(() => {
     loadAuthenticators();
-    syncTime(); // 初始时间同步
+    syncTime();
     
-    // 只保留时间同步的定时器，移除数据刷新定时器
     const timeInterval = setInterval(syncTime, 30000);
     
     return () => {
@@ -37,23 +37,35 @@ function App() {
     }
   };
 
-  const loadAuthenticators = async () => {
+  const loadAuthenticators = async (isAutoRefresh = false) => {
     try {
-      setLoading(true);
+      // 只有非自动刷新时才显示loading状态
+      if (!isAutoRefresh) {
+        setLoading(true);
+      }
+      
       const response = await api.getAuthenticators();
       setAuthenticators(response.data);
       setServerTime(response.server_time);
     } catch (error) {
       showAlert('加载失败: ' + error.message, 'danger');
     } finally {
-      setLoading(false);
+      if (!isAutoRefresh) {
+        setLoading(false);
+      }
     }
   };
 
-  // 新增：当倒计时到零时触发的回调函数
+  // 自动刷新（无感）
   const handleCountdownZero = () => {
-    console.log('倒计时到零，刷新验证码');
-    loadAuthenticators();
+    console.log('倒计时到零，无感刷新验证码');
+    loadAuthenticators(true); // 传入true表示自动刷新，不显示loading
+  };
+
+  // 手动刷新（显示loading）
+  const handleManualRefresh = () => {
+    console.log('手动刷新验证码');
+    loadAuthenticators(false); // 传入false表示手动刷新，显示loading
   };
 
   const showAlert = (message, variant = 'info') => {
@@ -66,7 +78,7 @@ function App() {
       await api.addAuthenticator(data);
       showAlert('添加成功', 'success');
       setShowModal(false);
-      loadAuthenticators();
+      loadAuthenticators(); // 添加时仍然显示loading
     } catch (error) {
       showAlert('添加失败: ' + error.message, 'danger');
     }
@@ -78,7 +90,7 @@ function App() {
     try {
       await api.deleteAuthenticator(id);
       showAlert('删除成功', 'success');
-      loadAuthenticators();
+      loadAuthenticators(); // 删除时仍然显示loading
     } catch (error) {
       showAlert('删除失败: ' + error.message, 'danger');
     }
@@ -91,7 +103,7 @@ function App() {
           <Col>
             <Header 
               onAddClick={() => setShowModal(true)}
-              onRefresh={loadAuthenticators}
+              onRefresh={handleManualRefresh} // 使用新的手动刷新函数
               totalCount={authenticators.length}
             />
             

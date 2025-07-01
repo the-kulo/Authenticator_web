@@ -5,54 +5,47 @@ import CountdownCircle from './CountdownCircle';
 
 const AuthenticatorTable = ({ authenticators, loading, onDelete, onCopy, serverTime, timeOffset, onCountdownZero }) => {
   const [countdown, setCountdown] = useState({});
-  const [lastRemaining, setLastRemaining] = useState(null);
   const [hasTriggered, setHasTriggered] = useState(false);
+  const [isAutoUpdating, setIsAutoUpdating] = useState(false); // 标记自动更新状态
 
   useEffect(() => {
-    // 初始化倒计时
     if (serverTime && authenticators.length > 0) {
       const newCountdown = {};
       authenticators.forEach(auth => {
         newCountdown[auth.id] = auth.remaining_time;
       });
       setCountdown(newCountdown);
-      setHasTriggered(false); // 重置触发状态
+      setHasTriggered(false);
+      setIsAutoUpdating(false);
     }
   }, [authenticators, serverTime]);
 
   useEffect(() => {
-    // 初始化倒计时 - 移除这个useEffect，统一在定时器中处理
-  }, []);
-
-  useEffect(() => {
     const interval = setInterval(() => {
-      // 使用服务器时间（OTP时间）
       const currentTime = Math.floor(Date.now() / 1000) + (timeOffset || 0);
       const remaining = 30 - (currentTime % 30);
       
       setCountdown(prev => {
         const newCountdown = { ...prev };
-        
         authenticators.forEach(auth => {
           newCountdown[auth.id] = remaining;
         });
-        
         return newCountdown;
       });
       
-      // 当倒计时为30秒（新周期开始）时触发刷新
+      // 自动刷新逻辑
       if (remaining === 30 && !hasTriggered && authenticators.length > 0) {
-        console.log(`OTP时间新周期开始，触发刷新: ${new Date().toLocaleTimeString()}`);
+        console.log(`自动刷新开始: ${new Date().toLocaleTimeString()}`);
         setHasTriggered(true);
+        setIsAutoUpdating(true);
         
-        // 延迟200ms确保服务器已生成新验证码
         setTimeout(() => {
-          console.log(`执行刷新: ${new Date().toLocaleTimeString()}`);
           onCountdownZero();
+          // 延迟重置更新状态，给用户视觉反馈
+          setTimeout(() => setIsAutoUpdating(false), 800);
         }, 50);
       }
       
-      // 重置触发状态
       if (remaining < 28 && hasTriggered) {
         setHasTriggered(false);
       }
@@ -70,12 +63,13 @@ const AuthenticatorTable = ({ authenticators, loading, onDelete, onCopy, serverT
     }
   };
 
+  // 手动刷新时显示loading
   if (loading) {
     return (
       <Card>
         <Card.Body className="text-center py-5">
           <Spinner animation="border" variant="primary" />
-          <div className="mt-2">正在加载验证码...</div>
+          <div className="mt-2">正在刷新验证码...</div>
         </Card.Body>
       </Card>
     );
@@ -117,7 +111,7 @@ const AuthenticatorTable = ({ authenticators, loading, onDelete, onCopy, serverT
                   </td>
                   <td className="text-center align-middle">
                     <span 
-                      className="totp-code"
+                      className={`totp-code ${isAutoUpdating ? 'auto-updating' : ''}`}
                       onClick={() => copyToClipboard(auth.totp_code)}
                       style={{
                         fontFamily: 'Courier New, monospace',
@@ -125,7 +119,7 @@ const AuthenticatorTable = ({ authenticators, loading, onDelete, onCopy, serverT
                         fontWeight: 'bold',
                         letterSpacing: '2px',
                         cursor: 'pointer',
-                        transition: 'all 0.2s'
+                        transition: 'all 0.3s ease'
                       }}
                       title="点击复制"
                     >
