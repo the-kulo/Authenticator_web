@@ -99,9 +99,10 @@ def get_authenticators():
         
         for auth in authenticators:
             try:
-                # Generate TOTP verification code
+                # Generate TOTP verification code using OTP time
                 totp = pyotp.TOTP(auth.secret_key)
-                current_code = totp.now()
+                # 确保使用OTP时间生成验证码
+                current_code = totp.at(current_time)
                 
                 # Calculate remaining time
                 remaining_time = 30 - (current_time % 30)

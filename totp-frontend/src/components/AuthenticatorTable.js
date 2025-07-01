@@ -21,9 +21,13 @@ const AuthenticatorTable = ({ authenticators, loading, onDelete, onCopy, serverT
   }, [authenticators, serverTime]);
 
   useEffect(() => {
+    // 初始化倒计时 - 移除这个useEffect，统一在定时器中处理
+  }, []);
+
+  useEffect(() => {
     const interval = setInterval(() => {
-      // 直接使用浏览器本地时间
-      const currentTime = Math.floor(Date.now() / 1000);
+      // 使用服务器时间（OTP时间）
+      const currentTime = Math.floor(Date.now() / 1000) + (timeOffset || 0);
       const remaining = 30 - (currentTime % 30);
       
       setCountdown(prev => {
@@ -38,11 +42,14 @@ const AuthenticatorTable = ({ authenticators, loading, onDelete, onCopy, serverT
       
       // 当倒计时为30秒（新周期开始）时触发刷新
       if (remaining === 30 && !hasTriggered && authenticators.length > 0) {
-        console.log(`新周期开始，触发刷新: ${new Date().toLocaleTimeString()}`);
+        console.log(`OTP时间新周期开始，触发刷新: ${new Date().toLocaleTimeString()}`);
         setHasTriggered(true);
         
-        // 立即刷新验证码
-        onCountdownZero();
+        // 延迟200ms确保服务器已生成新验证码
+        setTimeout(() => {
+          console.log(`执行刷新: ${new Date().toLocaleTimeString()}`);
+          onCountdownZero();
+        }, 50);
       }
       
       // 重置触发状态
@@ -52,7 +59,7 @@ const AuthenticatorTable = ({ authenticators, loading, onDelete, onCopy, serverT
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [authenticators, onCountdownZero, hasTriggered]);
+  }, [authenticators, timeOffset, onCountdownZero, hasTriggered]);
 
   const copyToClipboard = async (code) => {
     try {
