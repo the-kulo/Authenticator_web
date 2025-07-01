@@ -22,7 +22,8 @@ const AuthenticatorTable = ({ authenticators, loading, onDelete, onCopy, serverT
 
   useEffect(() => {
     const interval = setInterval(() => {
-      const currentTime = Math.floor(Date.now() / 1000) + (timeOffset || 0);
+      // 直接使用浏览器本地时间
+      const currentTime = Math.floor(Date.now() / 1000);
       const remaining = 30 - (currentTime % 30);
       
       setCountdown(prev => {
@@ -35,26 +36,23 @@ const AuthenticatorTable = ({ authenticators, loading, onDelete, onCopy, serverT
         return newCountdown;
       });
       
-      // 当倒计时为1秒时触发刷新
-      if (remaining === 1 && !hasTriggered && authenticators.length > 0) {
-        console.log(`倒计时1秒，准备刷新: ${new Date().toLocaleTimeString()}`);
+      // 当倒计时为30秒（新周期开始）时触发刷新
+      if (remaining === 30 && !hasTriggered && authenticators.length > 0) {
+        console.log(`新周期开始，触发刷新: ${new Date().toLocaleTimeString()}`);
         setHasTriggered(true);
         
-        // 延迟1.1秒后刷新，确保新验证码已生成
-        setTimeout(() => {
-          console.log(`执行刷新: ${new Date().toLocaleTimeString()}`);
-          onCountdownZero();
-        }, 1000);
+        // 立即刷新验证码
+        onCountdownZero();
       }
       
-      // 重置触发状态（在新周期开始时）
-      if (remaining > 25 && hasTriggered) {
+      // 重置触发状态
+      if (remaining < 28 && hasTriggered) {
         setHasTriggered(false);
       }
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [authenticators, timeOffset, onCountdownZero, hasTriggered]);
+  }, [authenticators, onCountdownZero, hasTriggered]);
 
   const copyToClipboard = async (code) => {
     try {
